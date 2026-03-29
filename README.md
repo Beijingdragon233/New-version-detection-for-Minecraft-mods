@@ -1,7 +1,7 @@
 # Minecraft Mod 版本检测工具
 
 一个用于检测 Minecraft 模组是否支持最新版本的游戏的 Python 工具。
-
+注：这个是ai生成的（满足我自己的需求）
 ## 功能特性
 
 - ✅ 支持 Forge、Fabric、NeoForge 模组格式
