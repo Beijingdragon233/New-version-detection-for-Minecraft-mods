@@ -142,4 +142,4 @@ python mod_version_checker.py
 
 ## 许可证
 
-MIT License
+CC0
