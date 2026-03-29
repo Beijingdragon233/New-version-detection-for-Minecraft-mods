@@ -13,6 +13,35 @@ from packaging import version
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
+CONFIG_FILE = Path(__file__).parent / 'config.json'
+DEFAULT_CONFIG = {
+    'curseforge_api_key': '',
+    'platform_priority': 'modrinth',
+    'thread_count': 5,
+    'timeout_seconds': 5
+}
+
+
+def load_config() -> Dict:
+    """加载配置文件"""
+    try:
+        if CONFIG_FILE.exists():
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                for key, value in DEFAULT_CONFIG.items():
+                    if key not in config:
+                        config[key] = value
+                return config
+        else:
+            print("配置文件不存在，创建默认配置文件...")
+            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(DEFAULT_CONFIG, f, indent=4, ensure_ascii=False)
+            return DEFAULT_CONFIG
+    except Exception as e:
+        print(f"加载配置文件失败：{e}，使用默认配置")
+        return DEFAULT_CONFIG
+
+
 @dataclass
 class ModInfo:
     """模组信息数据类"""
@@ -226,10 +255,9 @@ def parse_legacy_forge_mod(zf: zipfile.ZipFile, file_path: str) -> Optional[ModI
         return None
 
 
-def search_curseforge_exists(mod_name: str, mc_version: str) -> bool:
+def search_curseforge_exists(mod_name: str, mc_version: str, api_key: str = '') -> bool:
     """在 CurseForge 上检查模组是否存在指定版本"""
     try:
-        api_key = os.environ.get('CURSEFORGE_API_KEY', '')
         headers = {'X-Api-Key': api_key} if api_key else {}
         
         # 尝试多种搜索方式
@@ -273,7 +301,7 @@ def search_curseforge_exists(mod_name: str, mc_version: str) -> bool:
     return False
 
 
-def search_modrinth_exists(mod_name: str, mc_version: str) -> bool:
+def search_modrinth_exists(mod_name: str, mc_version: str, timeout: int = 5) -> bool:
     """在 Modrinth 上检查模组是否存在指定版本"""
     try:
         # 简化搜索，不使用 facets，直接搜索模组然后检查版本
@@ -283,7 +311,7 @@ def search_modrinth_exists(mod_name: str, mc_version: str) -> bool:
                 'query': mod_name,
                 'limit': 5
             },
-            timeout=5
+            timeout=timeout
         )
         
         if response.status_code == 200:
@@ -296,7 +324,7 @@ def search_modrinth_exists(mod_name: str, mc_version: str) -> bool:
                         try:
                             version_response = requests.get(
                                 f"https://api.modrinth.com/v2/project/{project_id}/version",
-                                timeout=5
+                                timeout=timeout
                             )
                             if version_response.status_code == 200:
                                 versions_data = version_response.json()
@@ -335,7 +363,7 @@ def scan_mods_folder(folder_path: str) -> List[ModInfo]:
     return mods
 
 
-def check_mod_updates(mod: ModInfo, latest_mc_versions: List[str]) -> Dict:
+def check_mod_updates(mod: ModInfo, latest_mc_versions: List[str], config: Dict) -> Dict:
     """检查模组是否存在指定版本"""
     result = {
         'mod_name': mod.name,
@@ -348,11 +376,19 @@ def check_mod_updates(mod: ModInfo, latest_mc_versions: List[str]) -> Dict:
         'status': '未知'
     }
     
+    api_key = config.get('curseforge_api_key', '')
+    platform_priority = config.get('platform_priority', 'modrinth')
+    timeout = config.get('timeout_seconds', 5)
+    
     print(f"\n检查模组：{mod.name} (当前版本：{mod.version}, MC: {mod.mc_version})")
     
     for mc_version in latest_mc_versions:
-        curseforge_exists = search_curseforge_exists(mod.name, mc_version)
-        modrinth_exists = search_modrinth_exists(mod.name, mc_version)
+        if platform_priority == 'modrinth':
+            modrinth_exists = search_modrinth_exists(mod.name, mc_version, timeout)
+            curseforge_exists = search_curseforge_exists(mod.name, mc_version, api_key) if not modrinth_exists else False
+        else:
+            curseforge_exists = search_curseforge_exists(mod.name, mc_version, api_key)
+            modrinth_exists = search_modrinth_exists(mod.name, mc_version, timeout) if not curseforge_exists else False
         
         if curseforge_exists or modrinth_exists:
             result['has_update'] = True
@@ -367,7 +403,7 @@ def check_mod_updates(mod: ModInfo, latest_mc_versions: List[str]) -> Dict:
     return result
 
 
-def check_mod_updates_parallel(mod: ModInfo, latest_mc_versions: List[str]) -> Dict:
+def check_mod_updates_parallel(mod: ModInfo, latest_mc_versions: List[str], config: Dict) -> Dict:
     """使用多线程检查模组是否存在指定版本"""
     result = {
         'mod_name': mod.name,
@@ -380,10 +416,18 @@ def check_mod_updates_parallel(mod: ModInfo, latest_mc_versions: List[str]) -> D
         'status': '未找到匹配版本'
     }
     
+    api_key = config.get('curseforge_api_key', '')
+    platform_priority = config.get('platform_priority', 'modrinth')
+    timeout = config.get('timeout_seconds', 5)
+    
     def check_single_version(mc_version: str) -> Optional[Tuple[str, str]]:
         """检查单个版本"""
-        curseforge_exists = search_curseforge_exists(mod.name, mc_version)
-        modrinth_exists = search_modrinth_exists(mod.name, mc_version)
+        if platform_priority == 'modrinth':
+            modrinth_exists = search_modrinth_exists(mod.name, mc_version, timeout)
+            curseforge_exists = search_curseforge_exists(mod.name, mc_version, api_key) if not modrinth_exists else False
+        else:
+            curseforge_exists = search_curseforge_exists(mod.name, mc_version, api_key)
+            modrinth_exists = search_modrinth_exists(mod.name, mc_version, timeout) if not curseforge_exists else False
         
         if curseforge_exists or modrinth_exists:
             platform = 'CurseForge' if curseforge_exists else 'Modrinth'
@@ -465,6 +509,15 @@ def main():
     print(f"检测时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print()
     
+    config = load_config()
+    print(f"已加载配置文件：{CONFIG_FILE}")
+    print(f"平台优先级：{config.get('platform_priority', 'modrinth')}")
+    if config.get('curseforge_api_key'):
+        print("CurseForge API Key：已配置")
+    else:
+        print("CurseForge API Key：未配置（可能影响 CurseForge 搜索结果）")
+    print()
+    
     mods_folder = input("请输入模组文件夹路径 (直接回车使用默认路径 './mods'): ").strip()
     if not mods_folder:
         mods_folder = './mods'
@@ -488,10 +541,10 @@ def main():
     if use_parallel:
         thread_count = input("输入线程数 (默认 5，范围 1-10): ").strip()
         try:
-            max_workers = int(thread_count) if thread_count else 5
+            max_workers = int(thread_count) if thread_count else config.get('thread_count', 5)
             max_workers = max(1, min(max_workers, 10))
         except:
-            max_workers = 5
+            max_workers = config.get('thread_count', 5)
         print(f"使用 {max_workers} 个线程进行检测")
     
     mods = scan_mods_folder(mods_folder)
@@ -506,7 +559,7 @@ def main():
         print(f"\n开始多线程检测，共 {len(mods)} 个模组...")
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {
-                executor.submit(check_mod_updates_parallel, mod, latest_mc_versions): mod 
+                executor.submit(check_mod_updates_parallel, mod, latest_mc_versions, config): mod 
                 for mod in mods
             }
             
@@ -532,7 +585,7 @@ def main():
         print(f"\n开始顺序检测，共 {len(mods)} 个模组...")
         for i, mod in enumerate(mods, 1):
             print(f"[{i}/{len(mods)}]", end=" ")
-            result = check_mod_updates(mod, latest_mc_versions)
+            result = check_mod_updates(mod, latest_mc_versions, config)
             results.append(result)
     
     print_summary(results)
