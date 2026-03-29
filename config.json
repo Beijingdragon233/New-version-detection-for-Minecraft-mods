@@ -2,5 +2,6 @@
     "curseforge_api_key": "",
     "platform_priority": "modrinth",
     "thread_count": 5,
-    "timeout_seconds": 5
+    "timeout_seconds": 5,
+    "log_level": "INFO"
 }
