@@ -1,6 +1,6 @@
 # Minecraft Mod 版本检测工具 v2
 
-一个基于 PCL2 模组匹配逻辑的 Minecraft 模组版本检测工具，支持 CurseForge 和 Modrinth 双平台。
+一个学习 PCL2 模组匹配逻辑的 Minecraft 模组版本检测工具，支持 CurseForge 和 Modrinth 双平台。
 
 ## 功能特性
 
