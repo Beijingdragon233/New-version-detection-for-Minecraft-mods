@@ -1,146 +1,130 @@
-# Minecraft Mod 版本检测工具
+# Minecraft Mod 版本检测工具 v2
 
-一个用于检测 Minecraft 模组是否支持最新版本的游戏的 Python 工具。
-注：这个是ai生成的（满足我自己的需求）
-提示可能部分mod无法搜索成功请自行检查
+一个基于 PCL2 模组匹配逻辑的 Minecraft 模组版本检测工具，支持 CurseForge 和 Modrinth 双平台。
+
 ## 功能特性
 
-- ✅ 支持 Forge、Fabric、NeoForge 模组格式
-- ✅ 支持手动指定或自动获取 Minecraft 版本
-- ✅ 查询 CurseForge 和 Modrinth 平台的模组更新
-- ✅ 多线程并发检测，大幅提升检测速度
-- ✅ 检测模组是否存在指定 MC 版本
-- ✅ 命令行实时显示检测进度
-- ✅ 生成 CSV 格式的检测报告
-- ✅ 支持自定义模组文件夹路径
+- ✅ **Hash 精确匹配**
+  - CurseForge: MurmurHash2 算法
+  - Modrinth: SHA1 算法
+- ✅ **智能缓存机制**
+  - 缓存有效期：6 小时
+  - 减少重复 API 调用
+- ✅ **并行查询优化**
+  - 同时查询 CurseForge 和 Modrinth 两个平台
+  - 提高查询效率
+- ✅ **精确版本匹配**
+  - 支持所有 Minecraft 版本格式（包括 26.1）
+  - 检查项目是否支持目标版本，而非仅检查当前文件
+- ✅ **项目版本支持检查**
+  - 使用 Modrinth API: `GET /project/{id|slug}/version`
+  - 获取项目所有版本，手动检查 `game_versions` 字段
+  - 确保模组项目支持目标 Minecraft 版本
+- ✅ **可配置的日志系统**
+  - 支持 DEBUG/INFO/WARNING/ERROR/CRITICAL 级别
+  - 日志文件自动保存到 `logs/` 目录
 
-## 安装
+## 快速开始
 
-### 1. 安装 Python
-
-确保已安装 Python 3.8 或更高版本。
-
-### 2. 安装依赖
+### 1. 安装依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## 使用方法
+### 2. 配置（可选）
 
-### 基本使用
+编辑 `config.json` 文件：
 
-1. 将需要检测的模组文件（.jar）放入 `mods` 文件夹
-2. 运行程序：
+```json
+{
+    "curseforge_api_key": "",  // CurseForge API 密钥（可选）
+    "platform_priority": "modrinth",  // 平台优先级：modrinth 或 curseforge
+    "thread_count": 5,  // 并行查询线程数
+    "timeout_seconds": 5,  // API 请求超时时间（秒）
+    "log_level": "INFO"  // 日志级别
+}
+```
+
+### 3. 运行
 
 ```bash
-python mod_version_checker.py
+python mod_version_checker_v2.py
 ```
 
-3. 按提示操作：
-   - **选择版本获取方式**：
-     - `1` - 自动获取最新 Minecraft 版本（默认）
-     - `2` - 手动指定 Minecraft 版本
-     - `3` - 使用常用版本列表
-   - **选择检测模式**：
-     - `1` - 顺序检测（适合少量模组）
-     - `2` - 多线程检测（适合大量模组，速度更快，默认）
-   - **设置线程数**（仅多线程模式）：输入 1-10 之间的数字，默认 5
+### 4. 打包（可选）
 
-### 指定模组文件夹
+```bash
+# Windows
+build_v2.bat
 
-运行程序后，输入模组文件夹的完整路径，或直接回车使用默认的 `./mods` 文件夹。
-
-### 使用示例
-
-#### 示例 1：使用自动获取版本 + 多线程检测
-```
-请输入模组文件夹路径 (直接回车使用默认路径 './mods'): 
-请选择版本获取方式:
-1. 自动获取最新 Minecraft 版本
-2. 手动指定 Minecraft 版本
-3. 使用常用版本列表 (1.21.11, 1.21.10, 1.21.9, 1.21, 1.20)
-
-请输入选项 (1/2/3，默认 1): 1
-
-请选择检测模式:
-1. 顺序检测 (适合少量模组)
-2. 多线程检测 (适合大量模组，速度更快)
-输入选项 (1/2，默认 2): 2
-输入线程数 (默认 5，范围 1-10): 5
-```
-
-#### 示例 2：手动指定版本
-```
-请选择版本获取方式:
-1. 自动获取最新 Minecraft 版本
-2. 手动指定 Minecraft 版本
-3. 使用常用版本列表 (1.21.11, 1.21.10, 1.21.9, 1.21, 1.20)
-
-请输入选项 (1/2/3，默认 1): 2
-
-请输入要检测的 Minecraft 版本，多个版本用逗号或空格分隔
-例如：1.21.11, 1.21.10, 1.21.9 或 1.21.11 1.21.10 1.21.9
-输入版本：1.21.11,1.21.10,1.21
-将检测以下版本：1.21.11, 1.21.10, 1.21
+# 或手动打包
+pyinstaller --onefile mod_version_checker_v2.py
 ```
 
 ## 输出说明
 
-### 命令行输出
+程序会生成 CSV 格式的检测报告，包含以下字段：
 
-程序会在命令行实时显示：
-- 当前检测的模组名称和版本
-- 查询 CurseForge 和 Modrinth 的结果
-- 检测完成后显示摘要信息
+| 字段                   | 说明            |
+| -------------------- | ------------- |
+| mod\_name            | 模组名称          |
+| current\_version     | 当前版本          |
+| current\_mc\_version | 当前 MC 版本      |
+| mod\_type            | 模组类型          |
+| has\_match           | 是否有匹配         |
+| match\_platform      | 匹配平台          |
+| match\_version       | 匹配版本          |
+| match\_mc\_versions  | 匹配版本支持的 MC 版本 |
+| match\_mod\_loaders  | 匹配版本支持的加载器    |
+| hash\_match          | 是否为 Hash 匹配   |
+| status               | 状态            |
 
-### CSV 报告
+## 项目结构
 
-生成的 CSV 文件包含以下字段：
-- `mod_name`: 模组名称
-- `current_version`: 当前版本
-- `current_mc_version`: 当前支持的 MC 版本
-- `mod_type`: 模组类型 (Forge/Fabric/NeoForge)
-- `has_update`: 是否存在指定版本 (True/False)
-- `latest_mc_version`: 支持的 MC 版本
-- `platform`: 检测平台 (CurseForge/Modrinth)
-- `status`: 检测状态
+```
+.
+├── mod_version_checker_v2.py    # 主程序
+├── config.json                  # 配置文件
+├── requirements.txt             # Python 依赖
+├── build_v2.bat                 # 打包脚本
+├── MinecraftModCheckerV2.spec   # PyInstaller 配置
+├── LICENSE                      # 许可证
+└── .gitignore                   # Git 忽略文件
+```
 
-## 注意事项
+## 技术栈
 
-1. **网络连接**: 程序需要访问 CurseForge 和 Modrinth API，请确保网络连接正常
-2. **CurseForge API**: 如果需要更准确的 CurseForge 搜索结果，可以设置环境变量 `CURSEFORGE_API_KEY`
-3. **模组识别**: 程序通过解析 JAR 文件中的配置文件来识别模组信息，某些模组可能无法正确识别
+- **Python**: 3.13+
+- **依赖库**:
+  - requests - HTTP 请求
+  - packaging - 版本解析
+  - murmurhash - MurmurHash2 算法
+  - pyinstaller - 打包工具
 
-## 支持的模组格式
+## 参考
 
-### Fabric
-- 配置文件：`fabric.mod.json`
-- 识别字段：name, version, depends.minecraft
-
-### Forge (1.13+)
-- 配置文件：`META-INF/mods.toml`
-- 识别字段：modId, displayName, version
-
-### NeoForge
-- 配置文件：`META-INF/neoforge.mods.toml`
-- 识别字段：modId, displayName, version
-
-### Legacy Forge (1.12 及以下)
-- 配置文件：`mcmod.info`
-- 识别字段：name, version, mcversion
-
-## 故障排除
-
-### 问题：无法获取 Minecraft 版本
-**解决**: 检查网络连接，或程序会使用默认版本列表
-
-### 问题：模组无法识别
-**解决**: 确认模组文件格式正确，配置文件存在且格式正确
-
-### 问题：API 查询失败
-**解决**: 检查网络连接，稍后重试。CurseForge API 可能需要 API Key
+- [PCL2 源代码](https://github.com/Hex-Dragon/PCL2)
+- [Modrinth API 文档](https://docs.modrinth.com/)
+- [CurseForge API 文档](https://docs.curseforge.com/)
 
 ## 许可证
 
 CC0
+
+## 更新日志
+
+### v2.0.1 (2026-03-30)
+
+- ✅ 修复加载器大小写匹配问题
+- ✅ CSV 输出添加中文注释行
+- ✅ 增强超时处理和日志记录
+
+### v2.0.0 (2026-03-30)
+
+- ✅ 实现 PCL2 风格的 Hash 精确匹配
+- ✅ 支持 Modrinth 和 CurseForge 双平台
+- ✅ 智能缓存机制
+- ✅ 并行查询优化
+- ✅ 项目版本支持检查
+
